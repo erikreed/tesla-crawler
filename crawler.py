@@ -3,7 +3,6 @@ import requests
 import logging
 import pandas as pd
 import time
-from pprint import pformat
 
 
 logging.basicConfig()
@@ -17,7 +16,7 @@ URL = 'https://www.tesla.com/cpo_tool/ajax?exteriors=&model=MODEL_S&priceRange=0
 if METRO_ID is not None:
     URL += '&metroId=%d' % METRO_ID
 
-SLEEP_TIME = 60
+SLEEP_TIME = 180
 
 
 def filter_p85_autopilot(df):
@@ -26,7 +25,7 @@ def filter_p85_autopilot(df):
 
 class TeslaCrawler:
     def __init__(self, slack_client, filter_criteria=lambda df: df):
-        self.cars_seen = set()
+        self.cars_seen = pd.DataFrame()
         self.slack_client = slack_client
         self.filter_criteria = filter_criteria
 
@@ -40,15 +39,16 @@ class TeslaCrawler:
         for _, c in filtered_cars[~filtered_cars['Vin'].isin(self.cars_seen)].iterrows():
             logger.info('Spotted new %s', c)
             if self.slack_client:
-                self.slack_client.send_message('Spotted new: ```%s```' % pformat(c))
+                self.slack_client.send_message('Spotted new: ```%s```' % str(c))
 
-        new_cars = set(cars['Vin']).difference(self.cars_seen)
+        new_cars = cars if self.cars_seen.empty else cars[~cars['Vin'].isin(self.cars_seen['Vin'])]
         if len(new_cars):
-            logger.info('Added %d new vins', len(new_cars))
+            msg = 'Added %d new vins: ```%s```' % (len(new_cars), cars.groupby(['Badge', 'isAutopilot']).size().to_string())
+            logger.info(msg)
             if self.slack_client:
-                self.slack_client.send_message('Added %d new VINs.' % len(new_cars))
+                self.slack_client.send_message(msg)
 
-        self.cars_seen.update(cars['Vin'])
+        self.cars_seen = cars if self.cars_seen.empty else self.cars_seen.merge(cars, on='Vin', copy=False)
         logger.info('VINs seen: %d', len(self.cars_seen))
 
 

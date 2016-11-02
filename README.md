@@ -13,8 +13,5 @@ shows Teslas for the entire country. The only country code I had success with wa
 
 ## Usage
 ```bash
-$ python crawler.py \
-    --slack-token='TOKEN' \
-    --slack-username 'tesla-crawler'\
-    --slack-channel='teslas'
+$ python crawler.py --slack-webhook="https://.../"
 ```
