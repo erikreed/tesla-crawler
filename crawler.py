@@ -10,8 +10,13 @@ logging.basicConfig()
 logger = logging.getLogger('tesla-crawler')
 logger.setLevel(logging.INFO)
 
+METRO_ID = None  # 3 corresponds to SF
+
 URL = 'https://www.tesla.com/cpo_tool/ajax?exteriors=&model=MODEL_S&priceRange=0%2C150000' \
-      '&metroId=3&sort=featured%7Casc&titleStatus=used&country=US'
+              '&sort=featured%7Casc&titleStatus=used&country=US'
+if METRO_ID is not None:
+    URL += '&metroId=%d' % METRO_ID
+
 SLEEP_TIME = 60
 
 
@@ -48,33 +53,25 @@ class TeslaCrawler:
 
 
 class TeslaSlackClient:
-    def __init__(self, token, channel, username):
-        from slackclient import SlackClient
-
-        self.client = SlackClient(token)
-        self.channel = channel
-        self.username = username
-        logger.debug('Initialized Slack client with username %s, channel %s', self.username, self.channel)
+    def __init__(self, webhook):
+        self.webhook = webhook
+        logger.debug('Initialized Slack client with webhook URL: %s', webhook)
 
     def send_message(self, text):
-        logger.debug(self.client.api_call(
-            'chat.postMessage',
-            channel=self.channel,
-            text=text,
-            username=self.username,
-        ))
+        r = requests.post(
+            url=self.webhook,
+            json={'text': text},
+        )
+        assert r.status_code == 200
 
 
 def main():
     parser = argparse.ArgumentParser(description='Tesla CPO crawler and slack client')
-    parser.add_argument('--slack-token', help='Slack API token. If not set, do not enable Slack client.')
-    parser.add_argument('--slack-username', help='Slack username to post as')
-    parser.add_argument('--slack-channel', help='Slack channel to VINs to')
+    parser.add_argument('--slack-webhook', help='Slack webhook URL.')
 
     args = parser.parse_args()
-    if args.slack_token:
-        assert args.slack_username and args.slack_channel
-        slack_client = TeslaSlackClient(token=args.slack_token, channel=args.slack_channel, username=args.slack_username)
+    if args.slack_webhook:
+        slack_client = TeslaSlackClient(webhook=args.slack_webhook)
     else:
         logger.info('Slack client not enabled')
         slack_client = None
